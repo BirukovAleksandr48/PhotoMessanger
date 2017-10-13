@@ -21,6 +21,7 @@ import android.widget.TextView;
 import com.google.gson.Gson;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -34,12 +35,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public static final int REQUEST_CODE_PHOTO = 1111;
     public static final int UPDATE = 2222;
-    public static final String KEY_JSONMES = "KEY_JSONMES";
+    public static final String KEY_POSITION = "KEY_POSITION";
+    public static final String KEY_NAME = "KEY_NAME";
+    public static final String KEY_MES = "KEY_MES";
+    public static final String KEY_PATH = "KEY_PATH";
 
     public static Handler handler;
     private ArrayList<MyMessage> mMessages = new ArrayList<>();
     MessageAdapter adapter;
-    File directory;
+    SingletListMessage mSinglet;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,10 +66,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         recView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
         recView.setAdapter(adapter);
 
-        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MyFolder");
-        if(!directory.exists()){
-            directory.mkdirs();
-        }
+        mSinglet = SingletListMessage.get(getApplicationContext());
     }
 
     @Override
@@ -80,10 +81,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    public void sendMessage(String jsonObj){
+    public void sendMessage(String name, String mes, String path){
         Log.e("MyLog", "sendMessage");
         Intent intent = new Intent(this, MessangerService.class);
-        intent.putExtra(KEY_JSONMES, jsonObj);
+        intent.putExtra(KEY_NAME, name);
+        intent.putExtra(KEY_MES, mes);
+        intent.putExtra(KEY_PATH, path);
         startService(intent);
     }
 
@@ -91,17 +94,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Log.e("MyLog", "onMessageBtnClick");
         String name = etName.getText().toString();
         String messageText = etMessage.getText().toString();
-        MyMessage message = new MyMessage(name, messageText, null);
-        Gson gson = new Gson();
-        String json = gson.toJson(message);
-        sendMessage(json);
+        sendMessage(name, messageText, null);
     }
 
     public void onPhotoBtnClick(){
         Log.e("MyLog", "onPhotoBtnClick");
-        File file = new File(directory.getPath() + "/" + "photo_" + System.currentTimeMillis() + ".jpg");
+
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, file);
         startActivityForResult(intent, REQUEST_CODE_PHOTO);
     }
 
@@ -120,10 +119,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             Bitmap bitmap = (Bitmap) obj;
                             String name = etName.getText().toString();
                             String messageText = etMessage.getText().toString();
-                            MyMessage message = new MyMessage(name, messageText, bitmap);
-                            Gson gson = new Gson();
-                            String json = gson.toJson(message);
-                            sendMessage(json);
+                            String path = SaveImage(bitmap);
+
+                            sendMessage(name, messageText, path);
                         }
                     }
                 }
@@ -138,9 +136,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Log.e("MyLog", "handleMessage");
             int what = msg.what;
             if(what == MainActivity.UPDATE){
-                String jsonObj = (String) msg.obj;
-                Gson gson = new Gson();
-                MyMessage myMessage = gson.fromJson(jsonObj, MyMessage.class);
+                Bundle bundle = msg.getData();
+                String name = bundle.getString(KEY_NAME);
+                String mes = bundle.getString(KEY_MES);
+                int position = bundle.getInt(KEY_POSITION);
+
+                MyMessage myMessage;
+                if(position == -1){
+                    Log.e("MyLog", "position = -1");
+                    myMessage = new MyMessage(name, mes, null);
+                }else {
+                    Log.e("MyLog", "position = " + String.valueOf(position));
+                    Log.e("MyLog", "size = " + String.valueOf(mSinglet.getBitmaps().size()));
+                    myMessage = new MyMessage(name, mes, mSinglet.getBitmap(position));
+                }
 
                 mMessages.add(myMessage);
                 updateRecyclerView();
@@ -197,4 +206,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         adapter.notifyDataSetChanged();
     }
 
+
+    private String SaveImage(Bitmap finalBitmap) {
+        File directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MyFolder");
+        if(!directory.exists()){
+            directory.mkdirs();
+        }
+        File file = new File(directory.getPath() + "/" + "photo_" + System.currentTimeMillis() + ".jpeg");
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 20, out);
+            out.flush();
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return file.getAbsolutePath();
+    }
 }
