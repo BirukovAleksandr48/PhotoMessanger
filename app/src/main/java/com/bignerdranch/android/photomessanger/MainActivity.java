@@ -2,6 +2,7 @@ package com.bignerdranch.android.photomessanger;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.os.*;
 import android.os.Message;
@@ -21,7 +22,9 @@ import android.widget.TextView;
 import com.google.gson.Gson;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -35,15 +38,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public static final int REQUEST_CODE_PHOTO = 1111;
     public static final int UPDATE = 2222;
-    public static final String KEY_POSITION = "KEY_POSITION";
     public static final String KEY_NAME = "KEY_NAME";
     public static final String KEY_MES = "KEY_MES";
     public static final String KEY_PATH = "KEY_PATH";
-
+    public static File sdPath = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/aPhotoMes");
     public static Handler handler;
     private ArrayList<MyMessage> mMessages = new ArrayList<>();
     MessageAdapter adapter;
-    SingletListMessage mSinglet;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,7 +67,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         recView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
         recView.setAdapter(adapter);
 
-        mSinglet = SingletListMessage.get(getApplicationContext());
+        if(!sdPath.exists()){
+            sdPath.mkdir();
+        }
     }
 
     @Override
@@ -99,7 +102,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void onPhotoBtnClick(){
         Log.e("MyLog", "onPhotoBtnClick");
-
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         startActivityForResult(intent, REQUEST_CODE_PHOTO);
     }
@@ -112,15 +114,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             if (resultCode == RESULT_OK){
                 if(data == null) return;
                 else {
-                    Bundle bndl = data.getExtras();
-                    if(bndl != null){
+                    if(data.getExtras() != null){
                         Object obj = data.getExtras().get("data");
                         if(obj instanceof Bitmap){
                             Bitmap bitmap = (Bitmap) obj;
                             String name = etName.getText().toString();
                             String messageText = etMessage.getText().toString();
                             String path = SaveImage(bitmap);
-
                             sendMessage(name, messageText, path);
                         }
                     }
@@ -139,16 +139,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Bundle bundle = msg.getData();
                 String name = bundle.getString(KEY_NAME);
                 String mes = bundle.getString(KEY_MES);
-                int position = bundle.getInt(KEY_POSITION);
+                String path = bundle.getString(KEY_PATH);
 
                 MyMessage myMessage;
-                if(position == -1){
-                    Log.e("MyLog", "position = -1");
+                if(path == null){
+                    Log.e("MyLog", "path == null");
                     myMessage = new MyMessage(name, mes, null);
                 }else {
-                    Log.e("MyLog", "position = " + String.valueOf(position));
-                    Log.e("MyLog", "size = " + String.valueOf(mSinglet.getBitmaps().size()));
-                    myMessage = new MyMessage(name, mes, mSinglet.getBitmap(position));
+                    Bitmap bmp = BitmapFactory.decodeFile(path);
+                    myMessage = new MyMessage(name, mes, bmp);
                 }
 
                 mMessages.add(myMessage);
@@ -206,19 +205,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         adapter.notifyDataSetChanged();
     }
 
-
-    private String SaveImage(Bitmap finalBitmap) {
-        File directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MyFolder");
-        if(!directory.exists()){
-            directory.mkdirs();
-        }
-        File file = new File(directory.getPath() + "/" + "photo_" + System.currentTimeMillis() + ".jpeg");
+    public static String SaveImage(Bitmap finalBitmap) {
+        File file = new File(sdPath.getPath() + "/" + "photo_" + System.currentTimeMillis() + ".jpeg");
         try {
             FileOutputStream out = new FileOutputStream(file);
-            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 20, out);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
             out.flush();
             out.close();
-        } catch (Exception e) {
+        } catch (FileNotFoundException e){
+            e.printStackTrace();
+        }catch (IOException e){
             e.printStackTrace();
         }
         return file.getAbsolutePath();
