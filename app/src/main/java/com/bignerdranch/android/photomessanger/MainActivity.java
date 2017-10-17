@@ -31,6 +31,16 @@ import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.zip.Inflater;
 
+/*
+* Ошибка иногда в том, что с сервера отправляется картинка на 500 000,
+* а в телефон иногда приходит на много меньше, около 10 000
+*
+* Иногда ошибка в том что в методе "handleMessage"  при декодировке битмапа с карты памяти
+* получается нулевой битмап, хотя он там лежит на самом деле, существует
+*
+* А иногда все прекрасно работает, причем я ничего не меняю.
+*/
+
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
     ImageButton btnSendMes, btnSendImg;
     RecyclerView recView;
@@ -143,13 +153,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 MyMessage myMessage;
                 if(path == null){
-                    Log.e("MyLog", "path == null");
+                    Log.e("MyLog", "No Bitmap");
                     myMessage = new MyMessage(name, mes, null);
                 }else {
+                    Log.e("MyLog", "Bitmap enabled, path = " + path);
                     Bitmap bmp = BitmapFactory.decodeFile(path);
+                    if(bmp == null)
+                        Log.e("MyLog", "Bitmap is null");
                     myMessage = new MyMessage(name, mes, bmp);
                 }
-
+                Log.e("MyLog", "MyMessage created");
                 mMessages.add(myMessage);
                 updateRecyclerView();
             }
@@ -209,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         File file = new File(sdPath.getPath() + "/" + "photo_" + System.currentTimeMillis() + ".jpeg");
         try {
             FileOutputStream out = new FileOutputStream(file);
-            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 20, out);
             out.flush();
             out.close();
         } catch (FileNotFoundException e){

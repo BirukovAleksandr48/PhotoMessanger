@@ -12,19 +12,19 @@ import android.util.Log;
 
 import com.google.gson.Gson;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Scanner;
 
 public class MessangerService extends Service{
     private volatile Socket s;
-    private InputStream inputStream = null;
-    private ByteArrayOutputStream byteArray = null;
+    public static File sdPath = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/aPhotoMes");
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -44,31 +44,20 @@ public class MessangerService extends Service{
 
                     InetAddress ipAddress = InetAddress.getByName(address);
                     s = new Socket(ipAddress, serverPort);
-                    inputStream = s.getInputStream();
 
-                    while(true){
-                        byteArray = new ByteArrayOutputStream();
-                        byte[] buffer = new byte[1024];
-                        int count = 0;
-                        try {
-                            while((count = inputStream.read(buffer,0,buffer.length)) != -1) {
-                                byteArray.write(buffer, 0, count);
-                            }
-                        } catch (IOException e) {e.printStackTrace();}
+                    Scanner sc = new Scanner(s.getInputStream());
+                    while (true) {
+                        String jsonString = sc.nextLine();
+                        Log.e("MyLog", "Got a message from server. Length = " + String.valueOf(jsonString.length()));
 
-                        Log.e("MyLog", "Получил сообщение, размер: " + String.valueOf(byteArray.size()));
-                        if(byteArray.size() == 0){
-                            continue;
-                        }
-
-                        String jsonString = byteArray.toByteArray().toString();
                         Gson gson = new Gson();
                         MyMessage m = gson.fromJson(jsonString, MyMessage.class);
                         String path = null;
 
                         if(m.getImage() != null){
-                            path = MainActivity.SaveImage(m.getImage());
+                            path = SaveImage(m.getImage());
                         }
+                        Log.e("MyLog", "path = " + path);
 
                         Message mesToActivity = MainActivity.handler.obtainMessage();
                         mesToActivity.what = MainActivity.UPDATE;
@@ -80,13 +69,8 @@ public class MessangerService extends Service{
                         MainActivity.handler.sendMessage(mesToActivity);
 
                         Log.e("MyLog", "Сообщение в активити отправлено.");
-
-                        try {
-                            byteArray.close();
-                            byteArray = null;
-                        } catch (IOException e) {e.printStackTrace();}
                     }
-                } catch (IOException e) {e.printStackTrace();}
+                } catch (Exception e) {e.printStackTrace();}
             }
         }).start();
     }
@@ -113,7 +97,8 @@ public class MessangerService extends Service{
                             MyMessage message = new MyMessage(name, mes, bmp);
                             Gson gson = new Gson();
                             String jsonString = gson.toJson(message);
-                            sendData(jsonString.getBytes());
+                            Log.e("MyLog", "Размер отправляемого сообщения = " + String.valueOf(jsonString.length()));
+                            sendData(jsonString);
 
                             Log.e("MyLog", "Отправил сообщение");
                         } catch (IOException e) {e.printStackTrace();}
@@ -137,19 +122,32 @@ public class MessangerService extends Service{
         super.onDestroy();
     }
 
-    public void sendData(byte[] data) throws Exception {
+    public void sendData(String data) throws Exception {
 
         if (s == null || s.isClosed()) {
             throw new Exception("Невозможно отправить данные. Сокет не создан или закрыт");
         }
 
         try {
-            OutputStream os = s.getOutputStream();
-            os.write(data);
-            os.flush();
-            os.close();
+            PrintWriter pw = new PrintWriter(s.getOutputStream());
+            pw.write(data + "\n");
+            pw.flush();
         } catch (IOException e) {
             throw new Exception("Невозможно отправить данные: "+e.getMessage());
         }
+    }
+    public static String SaveImage(Bitmap finalBitmap) {
+        File file = new File(sdPath.getPath() + "/" + "photo_" + System.currentTimeMillis() + ".jpeg");
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 20, out);
+            out.flush();
+            out.close();
+        } catch (FileNotFoundException e){
+            e.printStackTrace();
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+        return file.getAbsolutePath();
     }
 }
