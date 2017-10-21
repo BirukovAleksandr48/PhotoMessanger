@@ -47,28 +47,30 @@ public class MessangerService extends Service{
 
                     Scanner sc = new Scanner(s.getInputStream());
                     while (true) {
-                        String jsonString = sc.nextLine();
-                        Log.e("MyLog", "Got a message from server. Length = " + String.valueOf(jsonString.length()));
+                        //synchronized (s) {
+                            String jsonString = sc.nextLine();
+                            Log.e("MyLog", "Got a message from server. Length = " + String.valueOf(jsonString.length()));
 
-                        Gson gson = new Gson();
-                        MyMessage m = gson.fromJson(jsonString, MyMessage.class);
-                        String path = null;
+                            Gson gson = new Gson();
+                            MyMessage m = gson.fromJson(jsonString, MyMessage.class);
+                            String path = null;
 
-                        if(m.getImage() != null){
-                            path = SaveImage(m.getImage());
-                        }
-                        Log.e("MyLog", "path = " + path);
+                            if (m.getImage() != null) {
+                                path = SaveImage(m.getImage());
+                            }
+                            Log.e("MyLog", "path = " + path);
 
-                        Message mesToActivity = MainActivity.handler.obtainMessage();
-                        mesToActivity.what = MainActivity.UPDATE;
-                        Bundle bundle = new Bundle();
-                        bundle.putString(MainActivity.KEY_NAME, m.getName());
-                        bundle.putString(MainActivity.KEY_MES, m.getMessage());
-                        bundle.putString(MainActivity.KEY_PATH, path);
-                        mesToActivity.setData(bundle);
-                        MainActivity.handler.sendMessage(mesToActivity);
+                            Message mesToActivity = MainActivity.handler.obtainMessage();
+                            mesToActivity.what = MainActivity.UPDATE;
+                            Bundle bundle = new Bundle();
+                            bundle.putString(MainActivity.KEY_NAME, m.getName());
+                            bundle.putString(MainActivity.KEY_MES, m.getMessage());
+                            bundle.putString(MainActivity.KEY_PATH, path);
+                            mesToActivity.setData(bundle);
+                            MainActivity.handler.sendMessage(mesToActivity);
 
-                        Log.e("MyLog", "Сообщение в активити отправлено.");
+                            Log.e("MyLog", "Сообщение в активити отправлено.");
+                        //}
                     }
                 } catch (Exception e) {e.printStackTrace();}
             }
@@ -88,21 +90,26 @@ public class MessangerService extends Service{
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        try {
-                            Bitmap bmp = null;
-                            if(path != null){
-                                bmp = BitmapFactory.decodeFile(path);
+                        //synchronized (s) {
+                            try {
+                                Bitmap bmp = null;
+                                if (path != null) {
+                                    bmp = BitmapFactory.decodeFile(path);
+                                }
+
+                                MyMessage message = new MyMessage(name, mes, bmp);
+                                Gson gson = new Gson();
+                                String jsonString = gson.toJson(message);
+                                Log.e("MyLog", "Размер отправляемого сообщения = " + String.valueOf(jsonString.length()));
+                                sendData(jsonString);
+
+                                Log.e("MyLog", "Отправил сообщение");
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } catch (Exception e) {
+                                e.printStackTrace();
                             }
-
-                            MyMessage message = new MyMessage(name, mes, bmp);
-                            Gson gson = new Gson();
-                            String jsonString = gson.toJson(message);
-                            Log.e("MyLog", "Размер отправляемого сообщения = " + String.valueOf(jsonString.length()));
-                            sendData(jsonString);
-
-                            Log.e("MyLog", "Отправил сообщение");
-                        } catch (IOException e) {e.printStackTrace();}
-                        catch(Exception e){e.printStackTrace();}
+                        //}
                     }
                 }).start();
             }

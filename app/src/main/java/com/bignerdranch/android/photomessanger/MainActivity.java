@@ -156,8 +156,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Log.e("MyLog", "No Bitmap");
                     myMessage = new MyMessage(name, mes, null);
                 }else {
+                    Bitmap bmp = null;
                     Log.e("MyLog", "Bitmap enabled, path = " + path);
-                    Bitmap bmp = BitmapFactory.decodeFile(path);
+                    BitmapFactory.Options options;
+                    try{
+                         bmp = BitmapFactory.decodeFile(path);
+                    }catch (OutOfMemoryError e) {
+                        options = new BitmapFactory.Options();
+                        options.inSampleSize = 2;
+                        bmp = BitmapFactory.decodeFile(path, options);
+
+                        Log.e("MyLog", "Zashlo");
+                    }
                     if(bmp == null)
                         Log.e("MyLog", "Bitmap is null");
                     myMessage = new MyMessage(name, mes, bmp);
